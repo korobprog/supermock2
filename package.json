@@ -1,0 +1,38 @@
+{
+  "name": "mock-interview-app",
+  "version": "1.0.0",
+  "description": "Mock Interview Application with local development support",
+  "scripts": {
+    "dev:db": "docker-compose -f docker-compose.dev.yml up",
+    "dev:db:detach": "docker-compose -f docker-compose.dev.yml up -d",
+    "dev:db:stop": "docker-compose -f docker-compose.dev.yml down",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev": "concurrently \"npm run dev:db:detach\" \"sleep 5 && npm run dev:backend\" \"sleep 8 && npm run dev:frontend\"",
+    "dev:setup": "npm run install:all && npm run dev:db:detach && sleep 10 && cd backend && npx prisma migrate dev && npx prisma db seed",
+    "dev:stop": "./stop-dev.sh",
+    "start:dev": "./start-dev.sh",
+    "start:docker": "./start-docker.sh",
+    "docker:up": "docker-compose up",
+    "docker:up:detach": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "docker:rebuild": "docker-compose down && docker-compose build && docker-compose up",
+    "docker:prod": "docker-compose down && docker-compose build && docker-compose up -d",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "clean": "docker-compose -f docker-compose.dev.yml down -v && docker-compose down -v",
+    "clean:all": "npm run clean && docker system prune -f"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "keywords": [
+    "mock-interview",
+    "react",
+    "nodejs",
+    "postgresql",
+    "redis"
+  ],
+  "author": "",
+  "license": "ISC"
+}

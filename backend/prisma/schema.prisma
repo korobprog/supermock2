@@ -1,0 +1,98 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  profile       Profile?
+  interviews    Interview[] @relation("Interviewer")
+  participations Interview[] @relation("Participant")
+  points        PointsTransaction[]
+}
+
+model Profile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  firstName       String
+  lastName        String
+  avatar          String?
+  specialization  String
+  bio            String?
+  interestId      String?
+  interest        Interest? @relation(fields: [interestId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Interest {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  category    InterestCategory
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  profiles    Profile[]
+}
+
+model Interview {
+  id              String    @id @default(uuid())
+  title           String
+  description     String
+  specialization  String
+  interviewerId   String
+  interviewer     User      @relation("Interviewer", fields: [interviewerId], references: [id])
+  participantId   String?
+  participant     User?     @relation("Participant", fields: [participantId], references: [id])
+  status          InterviewStatus @default(SCHEDULED)
+  scheduledAt     DateTime
+  duration        Int       // in minutes
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model PointsTransaction {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  amount          Int
+  type            TransactionType
+  description     String
+  createdAt       DateTime  @default(now())
+}
+
+enum Role {
+  USER
+  INTERVIEWER
+  ADMIN
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionType {
+  EARNED
+  SPENT
+  REFUNDED
+}
+
+enum InterestCategory {
+  PROGRAMMING
+  TESTING
+  ANALYTICS_DATA_SCIENCE
+  MANAGEMENT
+}

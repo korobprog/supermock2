@@ -2,20 +2,9 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Link,
   Navigate,
-  useNavigate,
 } from 'react-router-dom';
-import {
-  ThemeProvider,
-  createTheme,
-  CssBaseline,
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Box,
-} from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -27,10 +16,52 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
-import { useState, useEffect } from 'react';
-import api from './utils/axios';
+import TimeSlotsPage from './pages/TimeSlotsPage';
+import BookingPage from './pages/BookingPage';
+import MyBookingsPage from './pages/MyBookingsPage';
+import Navigation from './components/Navigation';
+import { useState } from 'react';
+import './components.css';
 
-const theme = createTheme();
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+      light: '#42a5f5',
+      dark: '#1565c0',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#f5f5f5',
+      paper: '#ffffff',
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h6: {
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiAppBar: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          borderRadius: 8,
+        },
+      },
+    },
+  },
+});
 
 // PrivateRoute component to protect routes
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -38,123 +69,29 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return token ? <>{children}</> : <Navigate to="/login" />;
 };
 
-// AppBar with logout button
-const AppBarWithLogout = () => {
-  const navigate = useNavigate();
+function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     !!localStorage.getItem('token')
   );
-  const [userRole, setUserRole] = useState<string>('');
 
-  // Fetch user role when authenticated
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (isAuthenticated) {
-        try {
-          const response = await api.get('/users/me');
-          setUserRole(response.data.data.user.role);
-        } catch (error) {
-          console.error('Failed to fetch user role:', error);
-          setUserRole('');
-        }
-      } else {
-        setUserRole('');
-      }
-    };
-
-    fetchUserRole();
-  }, [isAuthenticated]);
-
-  // Listen for storage changes (e.g., login/logout in other tabs)
-  window.addEventListener('storage', () => {
-    setIsAuthenticated(!!localStorage.getItem('token'));
-  });
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setIsAuthenticated(false);
-    navigate('/login');
-  };
-
-  return (
-    <AppBar position="static">
-      <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Mock Interview Platform
-        </Typography>
-        {!isAuthenticated && (
-          <Button color="inherit" component={Link} to="/login">
-            Login
-          </Button>
-        )}
-        {!isAuthenticated && (
-          <Button color="inherit" component={Link} to="/register">
-            Register
-          </Button>
-        )}
-        <Button color="inherit" component={Link} to="/dashboard">
-          Dashboard
-        </Button>
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/profile">
-            Profile
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/interviews">
-            Interviews
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/scoring">
-            Scoring
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/feedback">
-            Feedback
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/analytics">
-            Analytics
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/notifications">
-            Notifications
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" component={Link} to="/settings">
-            Settings
-          </Button>
-        )}
-        {isAuthenticated && userRole === 'ADMIN' && (
-          <Button color="inherit" component={Link} to="/admin">
-            Admin
-          </Button>
-        )}
-        {isAuthenticated && (
-          <Button color="inherit" onClick={handleLogout}>
-            Exit
-          </Button>
-        )}
-      </Toolbar>
-    </AppBar>
-  );
-};
-
-function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <AppBarWithLogout />
-        <Box sx={{ mt: 4 }}>
+        <Navigation
+          isAuthenticated={isAuthenticated}
+          setIsAuthenticated={setIsAuthenticated}
+        />
+        <Box className="main-content">
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/login"
+              element={<LoginPage setIsAuthenticated={setIsAuthenticated} />}
+            />
+            <Route
+              path="/register"
+              element={<RegisterPage setIsAuthenticated={setIsAuthenticated} />}
+            />
             <Route
               path="/dashboard"
               element={
@@ -192,6 +129,30 @@ function App() {
               element={
                 <PrivateRoute>
                   <FeedbackPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/timeslots"
+              element={
+                <PrivateRoute>
+                  <TimeSlotsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/booking"
+              element={
+                <PrivateRoute>
+                  <BookingPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/my-bookings"
+              element={
+                <PrivateRoute>
+                  <MyBookingsPage />
                 </PrivateRoute>
               }
             />

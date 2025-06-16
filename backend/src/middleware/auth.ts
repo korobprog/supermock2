@@ -33,13 +33,26 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
+    console.log(
+      '🔍 [AUTH DEBUG] Authentication middleware called for:',
+      req.method,
+      req.path
+    );
+    console.log('🔍 [AUTH DEBUG] Full URL:', req.url);
+    console.log('🔍 [AUTH DEBUG] Headers:', {
+      authorization: req.headers.authorization ? 'Bearer [TOKEN]' : 'Missing',
+      'content-type': req.headers['content-type'],
+    });
+
     // Get token from header
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('❌ [AUTH DEBUG] No valid authorization header');
       throw new UnauthorizedError('No token provided');
     }
 
     const token = authHeader.split(' ')[1];
+    console.log('✅ [AUTH DEBUG] Token found, verifying...');
 
     // Verify token
     const decoded = jwt.verify(token, env.JWT_SECRET) as {

@@ -4,6 +4,9 @@ import { BadRequestError, NotFoundError } from '../utils/errors';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import env from '../config/env';
+import fs from 'fs';
+import path from 'path';
+import { addPointsToUser } from './points.controller';
 
 // Register new user
 export const register = async (
@@ -49,6 +52,20 @@ export const register = async (
         },
       },
     });
+
+    // Начисляем 1 балл новому пользователю
+    try {
+      await addPointsToUser(user.id, 1, 'Приветственный бонус за регистрацию');
+      console.log(
+        `✅ Начислен 1 балл пользователю ${user.email} за регистрацию`
+      );
+    } catch (pointsError) {
+      console.error(
+        '❌ Ошибка при начислении баллов новому пользователю:',
+        pointsError
+      );
+      // Не прерываем процесс регистрации, если не удалось начислить баллы
+    }
 
     // Generate token
     const token = jwt.sign(
@@ -185,6 +202,9 @@ export const updateProfile = async (
         bio,
         interestId,
       },
+      include: {
+        interest: true,
+      },
     });
 
     res.json({
@@ -194,6 +214,132 @@ export const updateProfile = async (
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// Upload avatar
+export const uploadAvatar = async (
+  req: Request & { file?: any; processedFile?: any },
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    console.log('🔍 [AVATAR DEBUG] Upload avatar controller called');
+    console.log('🔍 [AVATAR DEBUG] User ID:', req.user?.id);
+    console.log(
+      '🔍 [AVATAR DEBUG] Processed file info:',
+      req.processedFile
+        ? {
+            filename: req.processedFile.filename,
+            originalname: req.processedFile.originalname,
+            mimetype: req.processedFile.mimetype,
+            size: req.processedFile.size,
+            path: req.processedFile.path,
+          }
+        : 'No processed file'
+    );
+
+    if (!req.processedFile) {
+      console.log('❌ [AVATAR DEBUG] No processed file in request');
+      throw new BadRequestError('Файл не был обработан');
+    }
+
+    // Получаем путь к файлу относительно папки uploads
+    const avatarPath = `/uploads/avatars/${req.processedFile.filename}`;
+    console.log('🔍 [AVATAR DEBUG] Avatar path:', avatarPath);
+
+    // Обновляем профиль пользователя с новым аватаром
+    console.log('🔍 [AVATAR DEBUG] Updating profile in database...');
+    const updatedProfile = await prisma.profile.update({
+      where: { userId: req.user!.id },
+      data: {
+        avatar: avatarPath,
+      },
+      include: {
+        interest: true,
+      },
+    });
+
+    console.log('✅ [AVATAR DEBUG] Profile updated successfully');
+    res.json({
+      status: 'success',
+      data: {
+        profile: updatedProfile,
+        avatarUrl: avatarPath,
+      },
+      message: 'Аватар успешно загружен и обработан',
+    });
+  } catch (error) {
+    console.log('❌ [AVATAR DEBUG] Error in uploadAvatar:', error);
+    next(error);
+  }
+};
+
+// Remove avatar
+export const removeAvatar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    console.log('🔍 [AVATAR DEBUG] Remove avatar controller called');
+    console.log('🔍 [AVATAR DEBUG] User ID:', req.user?.id);
+
+    // Получаем текущий профиль пользователя
+    const currentProfile = await prisma.profile.findUnique({
+      where: { userId: req.user!.id },
+    });
+
+    if (!currentProfile) {
+      throw new NotFoundError('Profile not found');
+    }
+
+    // Если у пользователя есть аватар, удаляем файл
+    if (currentProfile.avatar) {
+      const avatarPath = path.join(
+        process.cwd(),
+        'uploads',
+        currentProfile.avatar.replace('/uploads/', '')
+      );
+
+      console.log('🔍 [AVATAR DEBUG] Attempting to delete file:', avatarPath);
+
+      // Проверяем, существует ли файл, и удаляем его
+      if (fs.existsSync(avatarPath)) {
+        try {
+          fs.unlinkSync(avatarPath);
+          console.log('✅ [AVATAR DEBUG] Avatar file deleted successfully');
+        } catch (error) {
+          console.error('❌ [AVATAR DEBUG] Error deleting avatar file:', error);
+          // Продолжаем выполнение, даже если не удалось удалить файл
+        }
+      } else {
+        console.log('⚠️ [AVATAR DEBUG] Avatar file not found on disk');
+      }
+    }
+
+    // Обновляем профиль, убирая аватар
+    const updatedProfile = await prisma.profile.update({
+      where: { userId: req.user!.id },
+      data: {
+        avatar: null,
+      },
+      include: {
+        interest: true,
+      },
+    });
+
+    console.log('✅ [AVATAR DEBUG] Profile updated, avatar removed');
+    res.json({
+      status: 'success',
+      data: {
+        profile: updatedProfile,
+      },
+      message: 'Аватар успешно удален',
+    });
+  } catch (error) {
+    console.log('❌ [AVATAR DEBUG] Error in removeAvatar:', error);
     next(error);
   }
 };

@@ -20,6 +20,8 @@ import {
   Switch,
   Alert,
   Chip,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
@@ -31,6 +33,8 @@ import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import LinkIcon from '@mui/icons-material/Link';
 import api from '../utils/axios';
 
 // Настройка dayjs для работы с часовыми поясами
@@ -41,16 +45,33 @@ dayjs.locale('ru');
 interface Interview {
   id: string;
   title: string;
-  date: string;
+  scheduledAt: string;
   status: string;
   description?: string;
+  specialization?: string;
   interestCategory?: string;
+  videoLink?: string;
+  duration?: number;
+  interviewerId?: string;
+  participantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface InterviewResponse {
   interviews: Interview[];
   userInterest: string | null;
   isFiltered: boolean;
+}
+
+interface UserProfile {
+  firstName: string;
+  lastName: string;
+  specialization: string;
+  interest?: {
+    name: string;
+    category: string;
+  };
 }
 
 const InterviewPage = () => {
@@ -65,26 +86,72 @@ const InterviewPage = () => {
     title: '',
     date: '',
     description: '',
+    videoLink: '',
   });
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
   const [selectedTime, setSelectedTime] = useState<Dayjs | null>(null);
   const [showAllInterviews, setShowAllInterviews] = useState(false);
   const [userInterest, setUserInterest] = useState<string | null>(null);
   const [isFiltered, setIsFiltered] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     fetchInterviews();
+    fetchUserProfile();
   }, [showAllInterviews]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await api.get('/users/me');
+      const userData = response.data.data.user;
+      setUserProfile({
+        firstName: userData.profile.firstName,
+        lastName: userData.profile.lastName,
+        specialization: userData.profile.specialization,
+        interest: userData.profile.interest,
+      });
+    } catch (error) {
+      console.error('Ошибка при загрузке профиля:', error);
+    }
+  };
+
+  const generateInterviewTitle = () => {
+    if (!userProfile) return '';
+
+    const name = `${userProfile.firstName} ${userProfile.lastName}`;
+    const interest = userProfile.interest?.name || userProfile.specialization;
+
+    return `Интервью с ${name} - ${interest}`;
+  };
+
+  const handleAutoFillTitle = () => {
+    const autoTitle = generateInterviewTitle();
+    if (autoTitle) {
+      setFormData((prev) => ({ ...prev, title: autoTitle }));
+    }
+  };
 
   const fetchInterviews = async () => {
     try {
       const params = showAllInterviews ? { showAll: 'true' } : {};
       const response = await api.get('/interviews', { params });
-      const data: InterviewResponse = response.data;
+      console.log('Ответ сервера при загрузке интервью:', response.data);
 
-      setInterviews(data.interviews);
-      setUserInterest(data.userInterest);
-      setIsFiltered(data.isFiltered);
+      // Проверяем структуру ответа
+      if (response.data && Array.isArray(response.data.interviews)) {
+        const data: InterviewResponse = response.data;
+        setInterviews(data.interviews);
+        setUserInterest(data.userInterest);
+        setIsFiltered(data.isFiltered);
+      } else if (Array.isArray(response.data)) {
+        // Если сервер возвращает массив напрямую
+        setInterviews(response.data);
+        setUserInterest(null);
+        setIsFiltered(false);
+      } else {
+        console.error('Неожиданная структура ответа:', response.data);
+        setInterviews([]);
+      }
     } catch (error) {
       console.error('Ошибка при загрузке интервью:', error);
       setError('Не удалось загрузить интервью.');
@@ -98,18 +165,19 @@ const InterviewPage = () => {
       setCurrentInterview(interview);
       setFormData({
         title: interview.title,
-        date: interview.date,
+        date: interview.scheduledAt,
         description: interview.description || '',
+        videoLink: interview.videoLink || '',
       });
       // Парсим существующую дату для редактирования
-      if (interview.date) {
-        const parsedDate = dayjs(interview.date).tz('Europe/Moscow');
+      if (interview.scheduledAt) {
+        const parsedDate = dayjs(interview.scheduledAt).tz('Europe/Moscow');
         setSelectedDate(parsedDate);
         setSelectedTime(parsedDate);
       }
     } else {
       setCurrentInterview(null);
-      setFormData({ title: '', date: '', description: '' });
+      setFormData({ title: '', date: '', description: '', videoLink: '' });
       // Устанавливаем завтрашнюю дату по умолчанию
       setSelectedDate(dayjs().add(1, 'day'));
       // Устанавливаем время по умолчанию на 10:00
@@ -130,29 +198,93 @@ const InterviewPage = () => {
 
   const handleSave = async () => {
     try {
+      // Валидация всех обязательных полей
+      const errors = [];
+
+      if (!formData.title.trim()) {
+        errors.push('Название интервью');
+      }
+
+      if (!selectedDate) {
+        errors.push('Дата интервью');
+      }
+
+      if (!selectedTime) {
+        errors.push('Время интервью');
+      }
+
+      if (!formData.videoLink.trim()) {
+        errors.push('Ссылка на видеоконференцию');
+      }
+
+      if (!formData.description.trim()) {
+        errors.push('Описание интервью');
+      } else if (formData.description.trim().length < 10) {
+        errors.push('Описание интервью (минимум 10 символов)');
+      }
+
+      if (errors.length > 0) {
+        setError(`Заполните обязательные поля: ${errors.join(', ')}`);
+        return;
+      }
+
       // Проверяем, что выбранная дата не в прошлом
       if (selectedDate && selectedDate.isBefore(dayjs(), 'day')) {
         setError('Нельзя выбрать дату в прошлом');
         return;
       }
 
-      // Объединяем дату и время в одну строку с указанием часового пояса МСК
-      let combinedDateTime = '';
+      // Объединяем дату и время в ISO формат для бэкенда
+      let scheduledAt = '';
       if (selectedDate && selectedTime) {
-        const date = selectedDate.format('YYYY-MM-DD');
-        const time = selectedTime.format('HH:mm');
-        combinedDateTime = `${date} ${time} (МСК)`;
+        // Создаем объединенную дату/время в московском часовом поясе
+        const combinedDateTime = selectedDate
+          .hour(selectedTime.hour())
+          .minute(selectedTime.minute())
+          .second(0)
+          .millisecond(0);
+
+        // Конвертируем в ISO формат для отправки на бэкенд
+        scheduledAt = combinedDateTime.toISOString();
       }
 
       const dataToSend = {
-        ...formData,
-        date: combinedDateTime,
+        title: formData.title,
+        description: formData.description,
+        scheduledAt: scheduledAt,
+        videoLink: formData.videoLink,
+        specialization: 'PROGRAMMING', // Добавляем обязательное поле
+        duration: 60, // Добавляем обязательное поле (60 минут по умолчанию)
       };
 
+      console.log('Отправляем данные на сервер:', dataToSend);
+
       if (currentInterview) {
-        await api.patch(`/interviews/${currentInterview.id}`, dataToSend);
+        // Для обновления используем только измененные поля
+        const updateData: {
+          title?: string;
+          description?: string;
+          videoLink?: string;
+          scheduledAt?: string;
+        } = {};
+        if (formData.title !== currentInterview.title)
+          updateData.title = formData.title;
+        if (formData.description !== currentInterview.description)
+          updateData.description = formData.description;
+        if (formData.videoLink !== currentInterview.videoLink)
+          updateData.videoLink = formData.videoLink;
+        if (scheduledAt) updateData.scheduledAt = scheduledAt;
+
+        console.log('Обновляем интервью:', updateData);
+        const response = await api.patch(
+          `/interviews/${currentInterview.id}`,
+          updateData
+        );
+        console.log('Ответ сервера при обновлении:', response.data);
       } else {
-        await api.post('/interviews', dataToSend);
+        console.log('Создаем новое интервью');
+        const response = await api.post('/interviews', dataToSend);
+        console.log('Ответ сервера при создании:', response.data);
       }
 
       fetchInterviews();
@@ -160,7 +292,20 @@ const InterviewPage = () => {
       setError(''); // Очищаем ошибку при успешном сохранении
     } catch (error) {
       console.error('Ошибка при сохранении интервью:', error);
-      setError('Не удалось сохранить интервью.');
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as {
+          response: { data: { error?: string }; status: number };
+        };
+        console.error('Данные ошибки:', axiosError.response.data);
+        console.error('Статус ошибки:', axiosError.response.status);
+        setError(
+          `Ошибка сервера: ${
+            axiosError.response.data.error || 'Неизвестная ошибка'
+          }`
+        );
+      } else {
+        setError('Не удалось сохранить интервью.');
+      }
     }
   };
 
@@ -298,21 +443,39 @@ const InterviewPage = () => {
                 <ListItemText
                   primary={interview.title}
                   secondary={
-                    <>
-                      <Typography variant="body2" color="text.secondary">
-                        Дата: {interview.date} | Статус: {interview.status}
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        component="span"
+                      >
+                        Дата:{' '}
+                        {dayjs(interview.scheduledAt).format(
+                          'DD.MM.YYYY HH:mm'
+                        )}{' '}
+                        | Статус: {interview.status}
                       </Typography>
-                      {interview.interestCategory && (
+                      {interview.videoLink && (
+                        <Typography
+                          variant="body2"
+                          color="primary"
+                          component="div"
+                          sx={{ mt: 0.5 }}
+                        >
+                          📹 Видеоконференция: {interview.videoLink}
+                        </Typography>
+                      )}
+                      {interview.specialization && (
                         <Chip
                           label={getInterestDisplayName(
-                            interview.interestCategory
+                            interview.specialization
                           )}
                           size="small"
                           variant="outlined"
                           sx={{ mt: 0.5 }}
                         />
                       )}
-                    </>
+                    </Box>
                   }
                 />
                 <ListItemSecondaryAction>
@@ -354,15 +517,33 @@ const InterviewPage = () => {
               <Stack spacing={3} sx={{ mt: 1 }}>
                 <TextField
                   fullWidth
-                  label="Название"
+                  label="Название *"
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
+                  required
+                  error={!formData.title.trim()}
+                  helperText={!formData.title.trim() ? 'Обязательное поле' : ''}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip title="Автозаполнение на основе профиля">
+                          <IconButton
+                            onClick={handleAutoFillTitle}
+                            edge="end"
+                            size="small"
+                          >
+                            <AutoFixHighIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
 
                 <Box>
                   <Typography variant="subtitle1" gutterBottom>
-                    Дата интервью
+                    Дата интервью *
                   </Typography>
                   <DateCalendar
                     value={selectedDate}
@@ -376,15 +557,23 @@ const InterviewPage = () => {
                         paddingLeft: 1,
                         paddingRight: 1,
                       },
+                      ...(!selectedDate && {
+                        border: '1px solid #d32f2f',
+                        borderRadius: 1,
+                      }),
                     }}
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    Выберите дату проведения интервью (только будущие дни)
+                  <Typography
+                    variant="caption"
+                    color={!selectedDate ? 'error' : 'text.secondary'}
+                  >
+                    {!selectedDate ? 'Обязательное поле - ' : ''}Выберите дату
+                    проведения интервью (только будущие дни)
                   </Typography>
                 </Box>
 
                 <TimePicker
-                  label="Время (МСК)"
+                  label="Время (МСК) *"
                   value={selectedTime}
                   onChange={(newValue: Dayjs | null) =>
                     setSelectedTime(newValue)
@@ -393,20 +582,61 @@ const InterviewPage = () => {
                   slotProps={{
                     textField: {
                       fullWidth: true,
-                      helperText: 'Время по московскому часовому поясу',
+                      required: true,
+                      error: !selectedTime,
+                      helperText: !selectedTime
+                        ? 'Обязательное поле - Время по московскому часовому поясу'
+                        : 'Время по московскому часовому поясу',
                     },
                   }}
                 />
 
                 <TextField
                   fullWidth
-                  label="Описание"
+                  label="Ссылка на видеоконференцию *"
+                  name="videoLink"
+                  value={formData.videoLink}
+                  onChange={handleChange}
+                  required
+                  error={!formData.videoLink.trim()}
+                  placeholder="https://meet.google.com/... или https://zoom.us/..."
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LinkIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    !formData.videoLink.trim()
+                      ? 'Обязательное поле'
+                      : 'Поддерживаемые сервисы: Google Meet, Zoom, Microsoft Teams, Skype, Discord'
+                  }
+                />
+
+                <TextField
+                  fullWidth
+                  label="Описание *"
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
+                  required
+                  error={
+                    !formData.description.trim() ||
+                    formData.description.trim().length < 10
+                  }
                   multiline
                   rows={4}
                   placeholder="Дополнительная информация об интервью..."
+                  helperText={
+                    !formData.description.trim()
+                      ? 'Обязательное поле'
+                      : formData.description.trim().length < 10
+                      ? `Минимум 10 символов (введено: ${
+                          formData.description.trim().length
+                        })`
+                      : `Символов: ${formData.description.trim().length}`
+                  }
                 />
               </Stack>
             </LocalizationProvider>
@@ -418,7 +648,12 @@ const InterviewPage = () => {
               color="primary"
               variant="contained"
               disabled={
-                !selectedDate || !selectedTime || !formData.title.trim()
+                !selectedDate ||
+                !selectedTime ||
+                !formData.title.trim() ||
+                !formData.videoLink.trim() ||
+                !formData.description.trim() ||
+                formData.description.trim().length < 10
               }
             >
               Сохранить

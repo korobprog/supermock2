@@ -10,6 +10,9 @@ import {
   createInterest,
   updateInterest,
   deleteInterest,
+  blockUser,
+  unblockUser,
+  checkUserBlockStatus,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -24,6 +27,9 @@ import {
   createInterestSchema,
   updateInterestSchema,
   deleteInterestSchema,
+  blockUserSchema,
+  unblockUserSchema,
+  checkUserBlockSchema,
 } from '../schemas/user.schema';
 
 const router = Router();
@@ -129,6 +135,31 @@ router.delete(
   authorize('ADMIN'),
   validate(deleteInterestSchema),
   deleteInterest
+);
+
+// Admin routes for user blocking
+router.post(
+  '/:userId/block',
+  authenticate,
+  authorize('ADMIN'),
+  validate(blockUserSchema),
+  blockUser
+);
+
+router.delete(
+  '/:userId/block',
+  authenticate,
+  authorize('ADMIN'),
+  validate(unblockUserSchema),
+  unblockUser
+);
+
+router.get(
+  '/:userId/block-status',
+  authenticate,
+  authorize('ADMIN'),
+  validate(checkUserBlockSchema),
+  checkUserBlockStatus
 );
 
 export default router;

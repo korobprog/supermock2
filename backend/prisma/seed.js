@@ -135,6 +135,7 @@ function main() {
                     interviewerId: interviewer.id,
                     scheduledAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
                     duration: 60, // 60 minutes
+                    videoLink: 'https://meet.google.com/frontend-interview',
                 },
             }),
             prisma.interview.create({
@@ -145,6 +146,7 @@ function main() {
                     interviewerId: interviewer.id,
                     scheduledAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
                     duration: 90, // 90 minutes
+                    videoLink: 'https://meet.google.com/backend-interview',
                 },
             }),
         ]);

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
 import env from '../config/env';
 import { UnauthorizedError } from '../utils/errors';
+import { checkUserBlock } from '../controllers/user-block.controller';
 
 // Extend Express Request type to include user
 declare global {
@@ -69,6 +70,20 @@ export const authenticate = async (
 
     if (!user) {
       throw new UnauthorizedError('User not found');
+    }
+
+    // Check if user is blocked (skip for admin routes to allow admins to manage blocks)
+    if (!req.path.startsWith('/user-blocks')) {
+      const activeBlock = await checkUserBlock(user.id);
+      if (activeBlock) {
+        throw new UnauthorizedError(
+          `Аккаунт заблокирован. Причина: ${activeBlock.reason}${
+            activeBlock.isPermanent
+              ? ' (постоянная блокировка)'
+              : ` до ${activeBlock.endDate?.toLocaleDateString('ru-RU')}`
+          }`
+        );
+      }
     }
 
     // Attach user to request

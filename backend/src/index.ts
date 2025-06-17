@@ -10,6 +10,7 @@ import interviewRoutes from './routes/interview.routes';
 import notificationRoutes from './routes/notification.routes';
 import bookingRoutes from './routes/booking.routes';
 import pointsRoutes from './routes/points.routes';
+import userBlockRoutes from './routes/user-block.routes';
 import { errorHandler } from './utils/errors';
 import { rateLimiter } from './middleware/rateLimiter';
 
@@ -125,6 +126,7 @@ app.use(
 app.use(`${env.API_PREFIX}/interviews`, interviewRoutes);
 app.use(`${env.API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${env.API_PREFIX}/points`, pointsRoutes);
+app.use(`${env.API_PREFIX}/user-blocks`, userBlockRoutes);
 app.use(`${env.API_PREFIX}`, bookingRoutes);
 
 // Health check endpoint

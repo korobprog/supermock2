@@ -494,3 +494,176 @@ export const deleteInterest = async (
     next(error);
   }
 };
+
+// Block user (admin only)
+export const blockUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+    const { reason, endDate, isPermanent } = req.body;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Check if user is already blocked
+    const existingBlock = await prisma.userBlock.findFirst({
+      where: {
+        userId,
+        isActive: true,
+      },
+    });
+
+    if (existingBlock) {
+      throw new BadRequestError('User is already blocked');
+    }
+
+    // Create user block
+    const userBlock = await prisma.userBlock.create({
+      data: {
+        userId,
+        reason,
+        endDate: endDate ? new Date(endDate) : null,
+        isPermanent: isPermanent || false,
+        isActive: true,
+      },
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        userBlock,
+      },
+      message: 'User blocked successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Unblock user (admin only)
+export const unblockUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Find active block
+    const activeBlock = await prisma.userBlock.findFirst({
+      where: {
+        userId,
+        isActive: true,
+      },
+    });
+
+    if (!activeBlock) {
+      throw new BadRequestError('User is not currently blocked');
+    }
+
+    // Deactivate the block
+    const updatedBlock = await prisma.userBlock.update({
+      where: { id: activeBlock.id },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        userBlock: updatedBlock,
+      },
+      message: 'User unblocked successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Check user block status (admin only)
+export const checkUserBlockStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Find active block
+    const activeBlock = await prisma.userBlock.findFirst({
+      where: {
+        userId,
+        isActive: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // Check if block has expired
+    let isBlocked = false;
+    if (activeBlock) {
+      if (activeBlock.isPermanent) {
+        isBlocked = true;
+      } else if (activeBlock.endDate) {
+        isBlocked = new Date() < activeBlock.endDate;
+        // If block has expired, deactivate it
+        if (!isBlocked) {
+          await prisma.userBlock.update({
+            where: { id: activeBlock.id },
+            data: { isActive: false },
+          });
+        }
+      } else {
+        isBlocked = true;
+      }
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          profile: user.profile,
+        },
+        isBlocked,
+        blockInfo: isBlocked ? activeBlock : null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

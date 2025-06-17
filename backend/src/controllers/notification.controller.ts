@@ -1,5 +1,7 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { prisma } from '../config/database';
+import { BadRequestError, NotFoundError } from '../utils/errors';
 
 // Mock data for development
 const mockNotifications = [
@@ -101,5 +103,116 @@ export const createNotification = async (
   } catch (error) {
     console.error('Error creating notification:', error);
     res.status(500).json({ error: 'Failed to create notification' });
+  }
+};
+
+// Send admin notification to user (admin only)
+export const sendAdminNotification = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.params;
+    const { message } = req.body;
+
+    // Check if target user exists
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+      },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundError('User not found');
+    }
+
+    // Create admin notification
+    const adminNotification = await prisma.adminNotification.create({
+      data: {
+        userId,
+        message,
+      },
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        notification: adminNotification,
+        targetUser: {
+          id: targetUser.id,
+          email: targetUser.email,
+          profile: targetUser.profile,
+        },
+      },
+      message: 'Admin notification sent successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get admin notifications for user
+export const getUserAdminNotifications = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user.id;
+
+    const notifications = await prisma.adminNotification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        notifications,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Mark admin notification as read
+export const markAdminNotificationAsRead = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { notificationId } = req.params;
+    const userId = req.user.id;
+
+    // Find and update the notification
+    const notification = await prisma.adminNotification.findFirst({
+      where: {
+        id: notificationId,
+        userId,
+      },
+    });
+
+    if (!notification) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    const updatedNotification = await prisma.adminNotification.update({
+      where: { id: notificationId },
+      data: { isRead: true },
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        notification: updatedNotification,
+      },
+      message: 'Notification marked as read',
+    });
+  } catch (error) {
+    next(error);
   }
 };

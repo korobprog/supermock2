@@ -1,16 +1,30 @@
 import axios from 'axios';
 
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const apiPrefix = import.meta.env.VITE_API_PREFIX || '/api/v1';
+
+console.log('🔍 [FRONTEND DEBUG] API Configuration:', {
+  apiUrl,
+  apiPrefix,
+  baseURL: `${apiUrl}${apiPrefix}`,
+});
 
 // Создаем экземпляр axios с базовой конфигурацией
 const api = axios.create({
-  baseURL: `${apiUrl}/api/v1`,
+  baseURL: `${apiUrl}${apiPrefix}`,
   timeout: 10000,
 });
 
 // Interceptor для добавления токена к каждому запросу
 api.interceptors.request.use(
   (config) => {
+    console.log('🔍 [FRONTEND DEBUG] Making request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+    });
+
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

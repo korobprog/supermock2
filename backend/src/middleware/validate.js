@@ -16,11 +16,19 @@ const errors_1 = require("../utils/errors");
 const validate = (schema) => {
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
         try {
+            console.log('🔍 [DEBUG VALIDATION] Валидация запроса:', {
+                method: req.method,
+                url: req.url,
+                body: req.body,
+                query: req.query,
+                params: req.params,
+            });
             yield schema.parseAsync({
                 body: req.body,
                 query: req.query,
                 params: req.params,
             });
+            console.log('🔍 [DEBUG VALIDATION] Валидация прошла успешно');
             next();
         }
         catch (error) {
@@ -29,9 +37,11 @@ const validate = (schema) => {
                     path: err.path.join('.'),
                     message: err.message,
                 }));
+                console.error('🔍 [DEBUG VALIDATION] Ошибка валидации:', errors);
                 next(new errors_1.BadRequestError(JSON.stringify(errors)));
             }
             else {
+                console.error('🔍 [DEBUG VALIDATION] Неизвестная ошибка валидации:', error);
                 next(error);
             }
         }

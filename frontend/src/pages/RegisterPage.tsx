@@ -21,7 +21,11 @@ interface Interest {
   category: 'PROGRAMMING' | 'TESTING' | 'ANALYTICS_DATA_SCIENCE' | 'MANAGEMENT';
 }
 
-const RegisterPage = () => {
+interface RegisterPageProps {
+  setIsAuthenticated?: (value: boolean) => void;
+}
+
+const RegisterPage: React.FC<RegisterPageProps> = ({ setIsAuthenticated }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -99,6 +103,12 @@ const RegisterPage = () => {
       console.log('Registration successful:', response.data);
       // Store token and redirect to dashboard
       localStorage.setItem('token', response.data.data.token);
+
+      // Update authentication state in parent component
+      if (setIsAuthenticated) {
+        setIsAuthenticated(true);
+      }
+
       navigate('/dashboard');
     } catch (err: unknown) {
       console.error('Registration error:', err);

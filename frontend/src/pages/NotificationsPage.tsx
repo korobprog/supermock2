@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -12,11 +12,13 @@ import {
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import api from '../utils/axios';
+import { AxiosError } from 'axios';
 
 interface Notification {
-  id: string;
+  id: number;
   message: string;
   date: string;
+  type: string;
   read: boolean;
 }
 
@@ -29,27 +31,54 @@ const NotificationsPage = () => {
     fetchNotifications();
   }, []);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const response = await api.get('/notifications');
-      setNotifications(response.data.data.notifications);
+      setNotifications(response.data);
     } catch (err) {
-      console.error('Failed to load notifications:', err);
-      setError('Failed to load notifications.');
+      const axiosError = err as AxiosError;
+      console.error('Failed to load notifications:', axiosError);
+      if (axiosError.response?.status === 401) {
+        setError('Необходимо войти в систему для просмотра уведомлений.');
+      } else if (axiosError.response?.status === 404) {
+        setError(
+          'Эндпоинт уведомлений не найден. Проверьте настройки сервера.'
+        );
+      } else {
+        setError(
+          `Ошибка загрузки уведомлений: ${
+            axiosError.response?.status || 'Неизвестная ошибка'
+          }`
+        );
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}`, { read: true });
-      fetchNotifications();
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err);
-      setError('Failed to mark notification as read.');
-    }
-  };
+  const handleMarkAsRead = useCallback(
+    async (id: number) => {
+      try {
+        await api.patch(`/notifications/${id}/read`, { read: true });
+        fetchNotifications();
+      } catch (err) {
+        const axiosError = err as AxiosError;
+        console.error('Failed to mark notification as read:', axiosError);
+        if (axiosError.response?.status === 401) {
+          setError('Необходимо войти в систему.');
+        } else if (axiosError.response?.status === 404) {
+          setError('Уведомление не найдено.');
+        } else {
+          setError(
+            `Ошибка отметки уведомления: ${
+              axiosError.response?.status || 'Неизвестная ошибка'
+            }`
+          );
+        }
+      }
+    },
+    [fetchNotifications]
+  );
 
   if (loading) {
     return (
@@ -102,7 +131,10 @@ const NotificationsPage = () => {
                 {!notification.read && (
                   <IconButton
                     edge="end"
-                    onClick={() => handleMarkAsRead(notification.id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleMarkAsRead(notification.id);
+                    }}
                   >
                     <CheckCircleIcon />
                   </IconButton>

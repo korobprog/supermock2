@@ -23,6 +23,8 @@ import {
   MenuItem,
   Alert,
   Chip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,6 +32,12 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import api from '../utils/axios';
+import UsersTable from '../components/admin/UsersTable';
+import UserDetailsDialog from '../components/admin/UserDetailsDialog';
+import UserPointsManager from '../components/admin/UserPointsManager';
+import UserBlockManager from '../components/admin/UserBlockManager';
+import UserFeedbackManager from '../components/admin/UserFeedbackManager';
+import { type User as ApiUser } from '../utils/usersApi';
 
 interface Interest {
   id: string;
@@ -93,6 +101,9 @@ const AdminPage = () => {
     null
   );
   const [submitting, setSubmitting] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null);
+  const [userDetailsOpen, setUserDetailsOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -220,6 +231,165 @@ const AdminPage = () => {
     }
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
+  const handleUserSelect = (user: ApiUser) => {
+    setSelectedUser(user);
+    setUserDetailsOpen(true);
+  };
+
+  const handleUserPoints = (user: ApiUser) => {
+    setSelectedUser(user);
+    // Открываем компонент управления баллами в отдельном окне
+    window.open(`/admin/points/${user.id}`, '_blank');
+  };
+
+  const handleUserBlock = (user: ApiUser) => {
+    setSelectedUser(user);
+    // Открываем компонент управления блокировками в отдельном окне
+    window.open(`/admin/blocks/${user.id}`, '_blank');
+  };
+
+  const handleUserFeedback = (user: ApiUser) => {
+    setSelectedUser(user);
+    // Открываем компонент отправки уведомлений в отдельном окне
+    window.open(`/admin/feedback/${user.id}`, '_blank');
+  };
+
+  const closeAllDialogs = () => {
+    setSelectedUser(null);
+    setUserDetailsOpen(false);
+  };
+
+  const renderTabContent = () => {
+    switch (currentTab) {
+      case 0:
+        return renderInterestsTab();
+      case 1:
+        return (
+          <UsersTable
+            onUserSelect={handleUserSelect}
+            onUserBlock={handleUserBlock}
+            onUserPoints={handleUserPoints}
+            onUserFeedback={handleUserFeedback}
+          />
+        );
+      case 2:
+        return (
+          <Paper elevation={3} sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Управление баллами
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Выберите пользователя из таблицы пользователей для управления его
+              баллами.
+            </Typography>
+          </Paper>
+        );
+      case 3:
+        return (
+          <Paper elevation={3} sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Управление блокировками
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Выберите пользователя из таблицы пользователей для управления его
+              блокировками.
+            </Typography>
+          </Paper>
+        );
+      case 4:
+        return (
+          <Paper elevation={3} sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Отправка уведомлений
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Выберите пользователя из таблицы пользователей для отправки ему
+              уведомления.
+            </Typography>
+          </Paper>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderInterestsTab = () => (
+    <Paper elevation={3} sx={{ p: 3 }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
+        <Typography variant="h6">Управление интересами</Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Добавить интерес
+        </Button>
+      </Box>
+
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Название</TableCell>
+              <TableCell>Категория</TableCell>
+              <TableCell>Дата создания</TableCell>
+              <TableCell>Действия</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {interests.map((interest) => (
+              <TableRow key={interest.id}>
+                <TableCell>{interest.name}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={getCategoryName(interest.category)}
+                    color={getCategoryColor(interest.category)}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>
+                  {new Date(interest.createdAt).toLocaleDateString('ru-RU')}
+                </TableCell>
+                <TableCell>
+                  <IconButton
+                    onClick={() => handleOpenDialog(interest)}
+                    color="primary"
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleDeleteClick(interest)}
+                    color="error"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+            {interests.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  <Typography color="text.secondary">
+                    Интересы не найдены
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+
   if (loading) {
     return (
       <Box
@@ -258,76 +428,23 @@ const AdminPage = () => {
         </Alert>
       )}
 
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={3}
+      <Paper elevation={2} sx={{ mb: 3 }}>
+        <Tabs
+          value={currentTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Typography variant="h5">Управление интересами</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-          >
-            Добавить интерес
-          </Button>
-        </Box>
-
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Название</TableCell>
-                <TableCell>Категория</TableCell>
-                <TableCell>Дата создания</TableCell>
-                <TableCell>Действия</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {interests.map((interest) => (
-                <TableRow key={interest.id}>
-                  <TableCell>{interest.name}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getCategoryName(interest.category)}
-                      color={getCategoryColor(interest.category)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {new Date(interest.createdAt).toLocaleDateString('ru-RU')}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      onClick={() => handleOpenDialog(interest)}
-                      color="primary"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleDeleteClick(interest)}
-                      color="error"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {interests.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography color="text.secondary">
-                      Интересы не найдены
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+          <Tab label="Интересы" />
+          <Tab label="Пользователи" />
+          <Tab label="Баллы" />
+          <Tab label="Блокировки" />
+          <Tab label="Уведомления" />
+        </Tabs>
       </Paper>
+
+      {renderTabContent()}
 
       {/* Диалог создания/редактирования интереса */}
       <Dialog
@@ -413,6 +530,23 @@ const AdminPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Диалоги для работы с пользователями */}
+      {selectedUser && (
+        <>
+          <UserDetailsDialog
+            open={userDetailsOpen}
+            onClose={closeAllDialogs}
+            user={selectedUser}
+          />
+
+          <UserPointsManager user={selectedUser} onClose={closeAllDialogs} />
+
+          <UserBlockManager user={selectedUser} onClose={closeAllDialogs} />
+
+          <UserFeedbackManager user={selectedUser} onClose={closeAllDialogs} />
+        </>
+      )}
     </Box>
   );
 };

@@ -3,7 +3,11 @@ import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 import api from '../utils/axios';
 import { useNavigate } from 'react-router-dom';
 
-const LoginPage = () => {
+interface LoginPageProps {
+  setIsAuthenticated?: (value: boolean) => void;
+}
+
+const LoginPage: React.FC<LoginPageProps> = ({ setIsAuthenticated }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,6 +24,12 @@ const LoginPage = () => {
       console.log('Login successful:', response.data);
       // Store token in localStorage
       localStorage.setItem('token', response.data.data.token);
+
+      // Update authentication state in parent component
+      if (setIsAuthenticated) {
+        setIsAuthenticated(true);
+      }
+
       // Redirect to dashboard
       navigate('/dashboard');
     } catch (err) {

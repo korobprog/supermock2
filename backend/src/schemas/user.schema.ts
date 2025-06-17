@@ -85,3 +85,39 @@ export const deleteInterestSchema = z.object({
     id: z.string().uuid('Invalid interest ID'),
   }),
 });
+
+// Block user schema
+export const blockUserSchema = z.object({
+  body: z.object({
+    reason: z.string().min(5, 'Reason must be at least 5 characters'),
+    endDate: z.string().datetime('Invalid end date format').optional(),
+    isPermanent: z.boolean().default(false),
+  }),
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID'),
+  }),
+});
+
+// Unblock user schema
+export const unblockUserSchema = z.object({
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID'),
+  }),
+});
+
+// Check user block status schema
+export const checkUserBlockSchema = z.object({
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID'),
+  }),
+});
+
+// Send admin notification schema
+export const sendAdminNotificationSchema = z.object({
+  body: z.object({
+    message: z.string().min(5, 'Message must be at least 5 characters'),
+  }),
+  params: z.object({
+    userId: z.string().uuid('Invalid user ID'),
+  }),
+});

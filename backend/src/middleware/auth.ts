@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
 import env from '../config/env';
 import { UnauthorizedError } from '../utils/errors';
+import { checkUserBlock } from '../controllers/user-block.controller';
 
 // Extend Express Request type to include user
 declare global {
@@ -33,13 +34,26 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
+    console.log(
+      '🔍 [AUTH DEBUG] Authentication middleware called for:',
+      req.method,
+      req.path
+    );
+    console.log('🔍 [AUTH DEBUG] Full URL:', req.url);
+    console.log('🔍 [AUTH DEBUG] Headers:', {
+      authorization: req.headers.authorization ? 'Bearer [TOKEN]' : 'Missing',
+      'content-type': req.headers['content-type'],
+    });
+
     // Get token from header
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('❌ [AUTH DEBUG] No valid authorization header');
       throw new UnauthorizedError('No token provided');
     }
 
     const token = authHeader.split(' ')[1];
+    console.log('✅ [AUTH DEBUG] Token found, verifying...');
 
     // Verify token
     const decoded = jwt.verify(token, env.JWT_SECRET) as {
@@ -56,6 +70,20 @@ export const authenticate = async (
 
     if (!user) {
       throw new UnauthorizedError('User not found');
+    }
+
+    // Check if user is blocked (skip for admin routes to allow admins to manage blocks)
+    if (!req.path.startsWith('/user-blocks')) {
+      const activeBlock = await checkUserBlock(user.id);
+      if (activeBlock) {
+        throw new UnauthorizedError(
+          `Аккаунт заблокирован. Причина: ${activeBlock.reason}${
+            activeBlock.isPermanent
+              ? ' (постоянная блокировка)'
+              : ` до ${activeBlock.endDate?.toLocaleDateString('ru-RU')}`
+          }`
+        );
+      }
     }
 
     // Attach user to request

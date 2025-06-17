@@ -9,66 +9,242 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  role          Role      @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  profile       Profile?
-  interviews    Interview[] @relation("Interviewer")
-  participations Interview[] @relation("Participant")
-  points        PointsTransaction[]
+  id             String                @id @default(uuid())
+  email          String                @unique
+  password       String
+  role           Role                  @default(USER)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  profile        Profile?
+  interviews     Interview[]           @relation("Interviewer")
+  participations Interview[]           @relation("Participant")
+  points         PointsTransaction[]
+  timeSlots      TimeSlot[]
+  bookings       Booking[]
+  notifications  BookingNotification[]
+  blocks         UserBlock[]
+  adminNotifications AdminNotification[]
 }
 
 model Profile {
-  id              String    @id @default(uuid())
-  userId          String    @unique
-  user            User      @relation(fields: [userId], references: [id])
-  firstName       String
-  lastName        String
-  avatar          String?
-  specialization  String
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id])
+  firstName      String
+  lastName       String
+  avatar         String?
+  specialization String
   bio            String?
-  interestId      String?
-  interest        Interest? @relation(fields: [interestId], references: [id])
+  interestId     String?
+  interest       Interest? @relation(fields: [interestId], references: [id])
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
 
 model Interest {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  category    InterestCategory
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  profiles    Profile[]
+  id        String           @id @default(uuid())
+  name      String           @unique
+  category  InterestCategory
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  profiles  Profile[]
 }
 
 model Interview {
-  id              String    @id @default(uuid())
-  title           String
-  description     String
-  specialization  String
-  interviewerId   String
-  interviewer     User      @relation("Interviewer", fields: [interviewerId], references: [id])
-  participantId   String?
-  participant     User?     @relation("Participant", fields: [participantId], references: [id])
-  status          InterviewStatus @default(SCHEDULED)
-  scheduledAt     DateTime
-  duration        Int       // in minutes
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String              @id @default(uuid())
+  title          String
+  description    String
+  specialization String
+  interviewerId  String
+  interviewer    User                @relation("Interviewer", fields: [interviewerId], references: [id])
+  participantId  String?
+  participant    User?               @relation("Participant", fields: [participantId], references: [id])
+  status         InterviewStatus     @default(SCHEDULED)
+  scheduledAt    DateTime
+  duration       Int // in minutes
+  videoLink      String              // Ссылка на видеоконференцию (обязательное поле)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  feedback       InterviewFeedback?
+  scores         InterviewScore[]
+  questions      InterviewQuestion[]
+  result         InterviewResult?
+  booking        Booking?
+}
+
+model InterviewFeedback {
+  id          String    @id @default(uuid())
+  interviewId String    @unique
+  interview   Interview @relation(fields: [interviewId], references: [id])
+  content     String
+  rating      Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model InterviewScore {
+  id           String    @id @default(uuid())
+  interviewId  String
+  interview    Interview @relation(fields: [interviewId], references: [id])
+  criteriaName String
+  score        Int
+  comment      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model InterviewQuestion {
+  id          String           @id @default(uuid())
+  interviewId String
+  interview   Interview        @relation(fields: [interviewId], references: [id])
+  content     String
+  order       Int
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  answer      InterviewAnswer?
+}
+
+model InterviewAnswer {
+  id         String            @id @default(uuid())
+  questionId String            @unique
+  question   InterviewQuestion @relation(fields: [questionId], references: [id])
+  content    String
+  score      Int?
+  comment    String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model InterviewResult {
+  id          String    @id @default(uuid())
+  interviewId String    @unique
+  interview   Interview @relation(fields: [interviewId], references: [id])
+  totalScore  Int
+  decision    String
+  summary     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model EvaluationCriteria {
+  id          String                                @id @default(uuid())
+  name        String                                @unique
+  description String
+  maxScore    Int
+  createdAt   DateTime                              @default(now())
+  updatedAt   DateTime                              @updatedAt
+  templates   InterviewTemplateEvaluationCriteria[]
+}
+
+model InterviewTemplate {
+  id             String                                @id @default(uuid())
+  name           String
+  description    String
+  specialization String
+  createdAt      DateTime                              @default(now())
+  updatedAt      DateTime                              @updatedAt
+  criteria       InterviewTemplateEvaluationCriteria[]
+}
+
+model InterviewTemplateEvaluationCriteria {
+  id                   String             @id @default(uuid())
+  templateId           String
+  template             InterviewTemplate  @relation(fields: [templateId], references: [id])
+  evaluationCriteriaId String
+  evaluationCriteria   EvaluationCriteria @relation(fields: [evaluationCriteriaId], references: [id])
+
+  @@unique([templateId, evaluationCriteriaId])
 }
 
 model PointsTransaction {
-  id              String    @id @default(uuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  amount          Int
-  type            TransactionType
-  description     String
-  createdAt       DateTime  @default(now())
+  id          String          @id @default(uuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id])
+  amount      Int
+  type        TransactionType
+  description String
+  createdAt   DateTime        @default(now())
+}
+
+model TimeSlot {
+  id             String     @id @default(uuid())
+  interviewerId  String
+  interviewer    User       @relation(fields: [interviewerId], references: [id])
+  startTime      DateTime
+  endTime        DateTime
+  specialization String
+  status         SlotStatus @default(AVAILABLE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  booking        Booking?
+}
+
+model Booking {
+  id            String                @id @default(uuid())
+  slotId        String                @unique
+  slot          TimeSlot              @relation(fields: [slotId], references: [id])
+  candidateId   String
+  candidate     User                  @relation(fields: [candidateId], references: [id])
+  status        BookingStatus         @default(CREATED)
+  pointsSpent   Int
+  interviewId   String?               @unique
+  interview     Interview?            @relation(fields: [interviewId], references: [id])
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  notifications BookingNotification[]
+}
+
+model BookingNotification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  bookingId String
+  booking   Booking          @relation(fields: [bookingId], references: [id])
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+model UserBlock {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  isActive    Boolean   @default(true)
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  reason      String
+  isPermanent Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AdminNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  CANCELLED
+}
+
+enum BookingStatus {
+  CREATED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum NotificationType {
+  CREATION
+  CONFIRMATION
+  CANCELLATION
+  REMINDER
 }
 
 enum Role {
